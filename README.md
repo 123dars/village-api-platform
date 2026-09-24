@@ -74,25 +74,17 @@ flowchart TD
 ```text
 Village_API/
 ├── README.md
-├── .gitignore
 ├── backend/
 │   ├── app/
 │   ├── alembic/
-│   ├── dataset/
-│   ├── scripts/
-│   ├── tests/
-│   ├── templates/
-│   ├── .env.example
+│   ├── dataset/          # Contains the raw Census data
+│   ├── scripts/          # ETL and database seeding scripts
 │   ├── Dockerfile
 │   ├── main.py
-│   ├── pyproject.toml
-│   └── alembic.ini
+│   └── pyproject.toml
 └── frontend/
-    ├── public/
     ├── src/
-    ├── .env.example
     ├── package.json
-    ├── tsconfig.json
     └── vite.config.ts
 ```
 
@@ -104,7 +96,6 @@ Village_API/
 - Python 3.12+ (Using `uv`)
 - Node.js and npm
 - PostgreSQL / NeonDB
-- Redis (where required by backend services)
 - Git
 
 ### Backend Setup
@@ -124,19 +115,26 @@ Village_API/
    ```bash
    uv sync
    ```
-4. Create `backend/.env` using `backend/.env.example`. Typical configuration:
+4. Create `backend/.env` using `backend/.env.example`:
    ```env
-   DATABASE_URL=your_postgresql_connection_string
-   SECRET_KEY=your_secret_key
-   REDIS_URL=your_redis_connection_string
+   DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+   JWT_SECRET=your_jwt_secret_key
    ```
-5. Run the development server:
+5. Apply Database Migrations:
+   ```bash
+   alembic upgrade head
+   ```
+6. **Seed the Database (Important):**
+   To import the 564K village records from the dataset into your PostgreSQL database, run the ETL script:
+   ```bash
+   uv run python scripts/seed_data.py
+   ```
+7. Run the development server:
    ```bash
    uvicorn main:app --reload --port 8000
    ```
    **Backend:** http://127.0.0.1:8000  
    **Swagger UI:** http://127.0.0.1:8000/docs  
-   **ReDoc:** http://127.0.0.1:8000/redoc  
 
 ### Frontend Setup
 1. Navigate to the frontend directory:
@@ -160,6 +158,18 @@ Village_API/
    ```bash
    npm run dev
    ```
+
+---
+
+## 🐳 Docker Support
+
+The backend includes a highly optimized Dockerfile using `uv`. To build and run the backend via Docker:
+
+```bash
+cd backend
+docker build -t village-api-backend .
+docker run -p 8000:8000 --env-file .env village-api-backend
+```
 
 ---
 
@@ -188,8 +198,6 @@ Village_API/
 
 Major data areas include: `users`, `api_keys`, `request_logs`, `countries`, `states`, `districts`, `sub_districts`, `villages`, `user_state_access`, `alembic_version`.
 
-The current project dataset contains approximately **564K village records**.
-
 ### Migrations
 ```bash
 # Check current migration status
@@ -208,7 +216,7 @@ alembic revision --autogenerate -m "describe change"
 
 **Recommended deployment architecture:**
 - **Frontend** → Vercel / Netlify
-- **Backend** → Render / Railway
+- **Backend** → Render / Railway / Docker Container
 - **Database** → Neon PostgreSQL
 - **Redis** → Managed Redis (e.g., Upstash)
 
