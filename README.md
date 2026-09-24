@@ -1,5 +1,15 @@
 # 🌱 Village API — Rural Data & Administration Platform
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-blue.svg?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi" alt="FastAPI">
+  <img src="https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT">
+</p>
+
 <p align="center"><strong>India Village Data API + Admin Dashboard</strong><br>A full-stack platform for accessing, searching, managing, and monitoring village-level location data.</p>
 
 ---
@@ -74,6 +84,7 @@ flowchart TD
 ```text
 Village_API/
 ├── README.md
+├── LICENSE
 ├── backend/
 │   ├── app/
 │   ├── alembic/
@@ -253,6 +264,12 @@ This project was developed collaboratively.
 - [ ] Granular role-based administration
 - [ ] Production monitoring and alerting
 - [ ] Automated CI/CD pipelines
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
