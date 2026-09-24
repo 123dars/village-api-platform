@@ -70,7 +70,7 @@ type ApiLog = {
 
 
 
-const initialLogs: ApiLog[] = [
+export const initialLogs: ApiLog[] = [
   {
     id: 1,
     time: "10:32:15",
