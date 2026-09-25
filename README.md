@@ -12,6 +12,13 @@
 
 <p align="center"><strong>India Village Data API + Admin Dashboard</strong><br>A full-stack platform for accessing, searching, managing, and monitoring village-level location data.</p>
 
+## ?? Live Demo
+
+- **Backend API (Swagger UI):** [https://village-api-backend-07b0.onrender.com/docs](https://village-api-backend-07b0.onrender.com/docs)
+- **Frontend Admin Dashboard:** [*(Vercel URL here)*](#)
+
+---
+
 ---
 
 ## 📌 Project Overview
