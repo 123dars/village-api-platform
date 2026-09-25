@@ -53,15 +53,6 @@ type Page =
 
 
 
-type ApiLog = {
-  id: number;
-  time: string;
-  user: string;
-  endpoint: string;
-  response: number;
-  status: number;
-};
-
 
 
 
