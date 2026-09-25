@@ -14,27 +14,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const rawPath =
-      typeof req.query?.path === "string"
-        ? req.query.path
-        : "";
+    const incomingUrl = new URL(
+      req.url,
+      `https://${req.headers.host}`
+    );
 
-    if (!rawPath) {
-      return res.status(400).json({
-        error: "Missing proxy path.",
-      });
+    const proxyPrefix = "/api/proxy/";
+    let path = incomingUrl.pathname;
+
+    if (path.startsWith(proxyPrefix)) {
+      path = path.slice(proxyPrefix.length);
     }
 
-    const decodedPath = decodeURIComponent(rawPath).replace(/^\/+/, "");
+    path = path.replace(/^\/+/, "");
 
     const target = new URL(
-      `${backendBase.replace(/\/+$/, "")}/${decodedPath}`
+      `${backendBase.replace(/\/+$/, "")}/${path}`
     );
+
+    target.search = incomingUrl.search;
 
     const headers = {
       "X-API-Key": apiKey,
       "X-API-Secret": apiSecret,
-      Accept: "application/json",
+      "Accept": "application/json",
     };
 
     if (req.headers.authorization) {
