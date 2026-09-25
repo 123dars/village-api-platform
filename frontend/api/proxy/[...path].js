@@ -10,16 +10,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const rawPath = req.query?.path;
-
-    const path = Array.isArray(rawPath)
-      ? rawPath.join("/")
-      : rawPath || "";
-
     const incomingUrl = new URL(
       req.url,
       `https://${req.headers.host}`
     );
+
+    const proxyPrefix = "/api/proxy/";
+    let path = incomingUrl.pathname;
+
+    if (path.startsWith(proxyPrefix)) {
+      path = path.slice(proxyPrefix.length);
+    }
+
+    path = path.replace(/^\/+/, "");
 
     const target = new URL(
       `${backendBase.replace(/\/+$/, "")}/${path}`
@@ -27,18 +30,18 @@ export default async function handler(req, res) {
 
     target.search = incomingUrl.search;
 
-    const headers = new Headers();
-
-    headers.set("X-API-Key", apiKey);
-    headers.set("X-API-Secret", apiSecret);
-    headers.set("Accept", "application/json");
+    const headers = {
+      "X-API-Key": apiKey,
+      "X-API-Secret": apiSecret,
+      "Accept": "application/json",
+    };
 
     if (req.headers.authorization) {
-      headers.set("Authorization", req.headers.authorization);
+      headers.Authorization = req.headers.authorization;
     }
 
     if (req.headers["content-type"]) {
-      headers.set("Content-Type", req.headers["content-type"]);
+      headers["Content-Type"] = req.headers["content-type"];
     }
 
     const hasBody = !["GET", "HEAD"].includes(
