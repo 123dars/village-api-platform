@@ -1990,6 +1990,7 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
   const [userLogs, setUserLogs] = useState<AdminLog[]>([]);
   const [userLogsLoading, setUserLogsLoading] = useState(false);
   const [userLogsError, setUserLogsError] = useState("");
+  const [userAction, setUserAction] = useState<{ id: number; type: "approve" | "suspend" | "delete" | "reject" } | null>(null);
 
   const loadUsers = async () => {
     try {
@@ -2066,6 +2067,7 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
 
   const approveUser = async (user: AdminUserItem) => {
     try {
+      setUserAction({ id: user.id, type: "approve" });
       const updated = await approveAdminUser(user.id, { plan: user.plan || "free" });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       onNotify?.("User approved", `${updated.email} is now approved.`, "success");
@@ -2073,6 +2075,8 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
       const message = err instanceof Error ? err.message : "Unable to approve user.";
       setError(message);
       onNotify?.("User approval failed", message, "error");
+    } finally {
+      setUserAction(null);
     }
   };
 
@@ -2080,6 +2084,7 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
     const reason = window.prompt("Rejection reason:", "Application rejected by administrator.");
     if (!reason) return;
     try {
+      setUserAction({ id: user.id, type: "reject" });
       const updated = await rejectAdminUser(user.id, { reason });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       onNotify?.("User rejected", `${updated.email} was rejected.`, "warning");
@@ -2087,29 +2092,35 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
       const message = err instanceof Error ? err.message : "Unable to reject user.";
       setError(message);
       onNotify?.("User rejection failed", message, "error");
+    } finally {
+      setUserAction(null);
     }
   };
 
   const suspendOrActivate = async (user: AdminUserItem) => {
     const active = user.status === "active";
     try {
+      setUserAction({ id: user.id, type: "suspend" });
       const updated = await updateAdminUser(user.id, {
         status: active ? "suspended" : "active",
         is_active: !active,
       });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       if (selectedUser?.id === updated.id) setSelectedUser(updated);
-      onNotify?.("User status changed", `${updated.email} is now ${updated.status}.`, "success");
+      onNotify?.(active ? "User suspended" : "User activated", `${updated.email} is now ${updated.status}.`, "success");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to change user status.";
       setError(message);
       onNotify?.("User status change failed", message, "error");
+    } finally {
+      setUserAction(null);
     }
   };
 
   const deleteUser = async (user: AdminUserItem) => {
     if (!window.confirm(`Delete ${user.email}? This cannot be undone.`)) return;
     try {
+      setUserAction({ id: user.id, type: "delete" });
       await deleteAdminUser(user.id);
       setUsers(prev => prev.filter(u => u.id !== user.id));
       setSelectedIds(prev => prev.filter(id => id !== user.id));
@@ -2119,6 +2130,8 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
       const message = err instanceof Error ? err.message : "Unable to delete user.";
       setError(message);
       onNotify?.("User deletion failed", message, "error");
+    } finally {
+      setUserAction(null);
     }
   };
 
@@ -2324,9 +2337,9 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
             </div>
             <div className="flex flex-wrap gap-2 mt-4">
               <button onClick={loadUsers} className="bg-blue-600 text-white px-4 py-2 rounded-lg">Search</button>
-              <button disabled={!selectedIds.length} onClick={() => bulkAction("approve")} className="px-4 py-2 rounded-lg border disabled:opacity-40">Approve selected</button>
-              <button disabled={!selectedIds.length} onClick={() => bulkAction("suspend")} className="px-4 py-2 rounded-lg border disabled:opacity-40">Suspend selected</button>
-              <button disabled={!selectedIds.length} onClick={() => bulkAction("delete")} className="px-4 py-2 rounded-lg border border-red-200 text-red-600 disabled:opacity-40">Delete selected</button>
+              <button disabled={!selectedIds.length} onClick={() => bulkAction("approve")} className="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">✓ Approve selected</button>
+              <button disabled={!selectedIds.length} onClick={() => bulkAction("suspend")} className="px-4 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:bg-amber-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⏸ Suspend selected</button>
+              <button disabled={!selectedIds.length} onClick={() => bulkAction("delete")} className="px-4 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
             </div>
           </div>
 
@@ -2346,7 +2359,45 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
                       <td className="px-4 py-4"><span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium capitalize">{user.plan}</span></td>
                       <td className="px-4 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${user.status === "active" ? "bg-green-50 text-green-700" : user.status === "pending_approval" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{user.status.replaceAll("_", " ")}</span></td>
                       <td className="px-4 py-4 text-sm text-slate-600">{new Date(user.created_at).toLocaleDateString()}</td>
-                      <td className="px-4 py-4"><div className="flex flex-wrap gap-2"><button onClick={() => openUser(user)} className="px-3 py-1.5 border rounded-lg text-sm">View</button>{user.status !== "active" && <button onClick={() => approveUser(user)} className="px-3 py-1.5 border rounded-lg text-sm">Approve</button>}<button onClick={() => suspendOrActivate(user)} className="px-3 py-1.5 border rounded-lg text-sm">{user.status === "active" ? "Suspend" : "Activate"}</button><button onClick={() => deleteUser(user)} className="px-3 py-1.5 border border-red-200 text-red-600 rounded-lg text-sm">Delete</button></div></td>
+                      <td className="px-4 py-4">
+  <div className="flex flex-wrap gap-2">
+    <button
+      type="button"
+      onClick={() => openUser(user)}
+      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 active:bg-blue-200 active:scale-95 transition-all"
+    >
+      👁 View
+    </button>
+    {user.status !== "active" && (
+      <button
+        type="button"
+        disabled={userAction?.id === user.id}
+        onClick={() => approveUser(user)}
+        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {userAction?.id === user.id && userAction.type === "approve" ? "⏳ Approving..." : "✓ Approve"}
+      </button>
+    )}
+    <button
+      type="button"
+      disabled={userAction?.id === user.id}
+      onClick={() => suspendOrActivate(user)}
+      className={`px-3 py-1.5 rounded-lg text-sm font-medium border active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${user.status === "active" ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:bg-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200"}`}
+    >
+      {userAction?.id === user.id && userAction.type === "suspend"
+        ? (user.status === "active" ? "⏳ Suspending..." : "⏳ Activating...")
+        : (user.status === "active" ? "⏸ Suspend" : "✓ Activate")}
+    </button>
+    <button
+      type="button"
+      disabled={userAction?.id === user.id}
+      onClick={() => deleteUser(user)}
+      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {userAction?.id === user.id && userAction.type === "delete" ? "⏳ Deleting..." : "🗑 Delete"}
+    </button>
+  </div>
+</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2481,16 +2532,16 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
                             <button
                               disabled={updatingKeyId === key.id}
                               onClick={() => toggleKey(key)}
-                              className="px-3 py-1.5 border rounded-lg text-sm"
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${key.is_active ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"}`}
                             >
-                              {key.is_active ? "Revoke" : "Activate"}
+                              {updatingKeyId === key.id ? "⏳ Updating..." : key.is_active ? "Revoke" : "✓ Activate"}
                             </button>
                             <button
                               disabled={rotatingId === key.id}
                               onClick={() => rotateKey(key.id)}
-                              className="px-3 py-1.5 border rounded-lg text-sm"
+                              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 active:bg-blue-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {rotatingId === key.id ? "Rotating..." : "Rotate"}
+                              {rotatingId === key.id ? "⏳ Rotating..." : "↻ Rotate"}
                             </button>
                           </div>
                         </td>
