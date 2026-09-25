@@ -15,7 +15,7 @@
 ## ?? Live Demo
 
 - **Backend API (Swagger UI):** [https://village-api-backend-07b0.onrender.com/docs](https://village-api-backend-07b0.onrender.com/docs)
-- **Frontend Admin Dashboard:** [*(Vercel URL here)*](#)
+- **Frontend Admin Dashboard:** [https://village-api-platform-psi.vercel.app](https://village-api-platform-psi.vercel.app)
 
 ---
 
