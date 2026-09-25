@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -32,12 +32,14 @@ import {
   getUserStateAccess,
   updateUserStateAccess,
   getAdminLogs,
+  getCurrentUser,
   type DashboardStats,
   type State,
   type District,
   type SubDistrict,
   type Village as ApiVillage,
   type AdminUserItem,
+  type CurrentUser,
   type UserStateAccess,
   type ApiKeyItem,
   type AdminLog,
@@ -64,121 +66,40 @@ type ApiLog = {
 
 
 /* =========================
-   DEMO DATA
+   NOTIFICATIONS
 ========================= */
 
+type NotificationType = "success" | "info" | "warning" | "error";
 
+type AppNotification = {
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  createdAt: string;
+  read: boolean;
+};
 
+const NOTIFICATION_STORAGE_KEY = "village_api_notifications";
 
-export const initialLogs: ApiLog[] = [
-  {
-    id: 1,
-    time: "10:32:15",
-    user: "ABC Technologies",
-    endpoint: "/search",
-    response: 127,
-    status: 200,
-  },
+function readStoredNotifications(): AppNotification[] {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-  {
-    id: 2,
-    time: "10:31:42",
-    user: "XYZ Solutions",
-    endpoint: "/autocomplete",
-    response: 89,
-    status: 200,
-  },
-
-  {
-    id: 3,
-    time: "10:30:11",
-    user: "Demo Company",
-    endpoint: "/states",
-    response: 65,
-    status: 200,
-  },
-
-  {
-    id: 4,
-    time: "10:29:33",
-    user: "ABC Technologies",
-    endpoint: "/villages",
-    response: 420,
-    status: 429,
-  },
-
-  {
-    id: 5,
-    time: "10:28:20",
-    user: "XYZ Solutions",
-    endpoint: "/search",
-    response: 110,
-    status: 200,
-  },
-
-  {
-    id: 6,
-    time: "10:27:18",
-    user: "ABC Technologies",
-    endpoint: "/villages",
-    response: 152,
-    status: 200,
-  },
-
-  {
-    id: 7,
-    time: "10:26:05",
-    user: "Demo Company",
-    endpoint: "/search",
-    response: 98,
-    status: 200,
-  },
-
-  {
-    id: 8,
-    time: "10:25:44",
-    user: "XYZ Solutions",
-    endpoint: "/villages",
-    response: 375,
-    status: 429,
-  },
-
-  {
-    id: 9,
-    time: "10:24:31",
-    user: "ABC Technologies",
-    endpoint: "/districts",
-    response: 75,
-    status: 200,
-  },
-
-  {
-    id: 10,
-    time: "10:23:19",
-    user: "XYZ Solutions",
-    endpoint: "/states",
-    response: 62,
-    status: 200,
-  },
-
-  {
-    id: 11,
-    time: "10:22:07",
-    user: "ABC Technologies",
-    endpoint: "/search",
-    response: 135,
-    status: 200,
-  },
-
-  {
-    id: 12,
-    time: "10:21:43",
-    user: "Demo Company",
-    endpoint: "/villages",
-    response: 290,
-    status: 200,
-  },
-];
+function writeStoredNotifications(items: AppNotification[]) {
+  try {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(items.slice(0, 50)));
+  } catch {
+    // Ignore storage errors.
+  }
+}
 
 
 /* =========================
@@ -186,22 +107,107 @@ export const initialLogs: ApiLog[] = [
 ========================= */
 
 function App({ onLogout }: { onLogout?: () => void }) {
-
-  const [page, setPage] =
-    useState<Page>("Dashboard");
+  const [page, setPage] = useState<Page>("Dashboard");
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [notificationsRead, setNotificationsRead] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>(readStoredNotifications);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [toast, setToast] = useState<AppNotification | null>(null);
+  const lastLogIdRef = useRef<number | null>(null);
+
+  const pushNotification = (
+    title: string,
+    message: string,
+    type: NotificationType = "info",
+    options: { toast?: boolean; persist?: boolean } = {}
+  ) => {
+    const item: AppNotification = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      message,
+      type,
+      createdAt: new Date().toISOString(),
+      read: false,
+    };
+
+    setNotifications((current) => {
+      const next = [item, ...current].slice(0, 50);
+      writeStoredNotifications(next);
+      return next;
+    });
+
+    if (options.toast !== false) {
+      setToast(item);
+      window.setTimeout(() => {
+        setToast((current) => (current?.id === item.id ? null : current));
+      }, 4500);
+    }
+  };
 
   useEffect(() => {
-    try {
-      setNotificationsRead(
-        localStorage.getItem("village_api_notifications_read") === "true"
-      );
-    } catch {
-      setNotificationsRead(false);
-    }
+    let mounted = true;
+
+    const loadCurrentUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (mounted) setCurrentUser(user);
+      } catch (error) {
+        console.error("Unable to load current administrator:", error);
+      }
+    };
+
+    loadCurrentUser();
+    return () => { mounted = false; };
   }, []);
+
+  // Poll backend logs so important live API/security events can appear in the
+  // notification center without requiring a WebSocket service.
+  useEffect(() => {
+    let mounted = true;
+
+    const pollSecurityEvents = async () => {
+      try {
+        const response = await getAdminLogs({ page: 1, page_size: 20 });
+        const logs = response.items || [];
+        if (!logs.length || !mounted) return;
+
+        const newestId = Math.max(...logs.map((log) => Number(log.id)));
+
+        if (lastLogIdRef.current === null) {
+          lastLogIdRef.current = newestId;
+          return;
+        }
+
+        const newSecurityLogs = logs.filter((log) => {
+          const id = Number(log.id);
+          return id > (lastLogIdRef.current || 0) && [401, 403, 429, 500].includes(Number(log.status_code));
+        });
+
+        lastLogIdRef.current = Math.max(lastLogIdRef.current, newestId);
+
+        for (const log of newSecurityLogs.reverse()) {
+          const status = Number(log.status_code);
+          const type: NotificationType = status === 429 ? "warning" : "error";
+          pushNotification(
+            status === 429 ? "API rate limit alert" : "API security alert",
+            `${status} response on ${log.path || "API endpoint"}.`,
+            type
+          );
+        }
+      } catch {
+        // Do not interrupt the dashboard if notification polling fails.
+      }
+    };
+
+    pollSecurityEvents();
+    const timer = window.setInterval(pollSecurityEvents, 15000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   const handleNotificationClick = () => {
     setShowNotifications((open) => !open);
@@ -214,12 +220,19 @@ function App({ onLogout }: { onLogout?: () => void }) {
   };
 
   const markNotificationsRead = () => {
-    setNotificationsRead(true);
-    try {
-      localStorage.setItem("village_api_notifications_read", "true");
-    } catch {
-      // Ignore storage errors.
-    }
+    setNotifications((current) => {
+      const next = current.map((item) => ({ ...item, read: true }));
+      writeStoredNotifications(next);
+      return next;
+    });
+  };
+
+  const markNotificationRead = (id: string) => {
+    setNotifications((current) => {
+      const next = current.map((item) => item.id === id ? { ...item, read: true } : item);
+      writeStoredNotifications(next);
+      return next;
+    });
   };
 
   const handleLogout = () => {
@@ -294,7 +307,10 @@ function App({ onLogout }: { onLogout?: () => void }) {
           </p>
 
           <p className="text-sm font-medium mt-1">
-            Administrator
+            {currentUser?.full_name || "Administrator"}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 truncate" title={currentUser?.email || ""}>
+            {currentUser?.email || "Loading account…"}
           </p>
 
         </div>
@@ -323,59 +339,56 @@ function App({ onLogout }: { onLogout?: () => void }) {
                 className="relative text-xl w-10 h-10 rounded-lg hover:bg-slate-100 transition flex items-center justify-center"
               >
                 🔔
-
-                {!notificationsRead && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
-                    3
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-12 w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-slate-900">Notifications</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Admin platform alerts</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Live admin and system alerts</p>
                     </div>
-                    {!notificationsRead && (
-                      <button
-                        type="button"
-                        onClick={markNotificationsRead}
-                        className="text-xs text-blue-600 font-medium hover:underline"
-                      >
+                    {unreadCount > 0 && (
+                      <button type="button" onClick={markNotificationsRead} className="text-xs text-blue-600 font-medium hover:underline">
                         Mark all read
                       </button>
                     )}
                   </div>
 
-                  <div className="divide-y divide-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => { setPage("Dashboard"); setShowNotifications(false); }}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition"
-                    >
-                      <p className="text-sm font-medium text-slate-800">API usage monitoring</p>
-                      <p className="text-xs text-slate-500 mt-1">Review today's API request activity on the Dashboard.</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => { setPage("API Logs"); setShowNotifications(false); }}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition"
-                    >
-                      <p className="text-sm font-medium text-slate-800">Security activity</p>
-                      <p className="text-xs text-slate-500 mt-1">Review recent authentication and API request logs.</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => { setPage("Settings"); setShowNotifications(false); }}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 transition"
-                    >
-                      <p className="text-sm font-medium text-slate-800">Notification preferences</p>
-                      <p className="text-xs text-slate-500 mt-1">Manage usage, security and weekly report alerts.</p>
-                    </button>
+                  <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100">
+                    {notifications.length === 0 ? (
+                      <div className="px-5 py-10 text-center">
+                        <div className="text-2xl mb-2">✓</div>
+                        <p className="text-sm font-medium text-slate-700">You're all caught up</p>
+                        <p className="text-xs text-slate-500 mt-1">Important admin actions and API alerts will appear here.</p>
+                      </div>
+                    ) : (
+                      notifications.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => markNotificationRead(item.id)}
+                          className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition ${!item.read ? "bg-blue-50/50" : ""}`}
+                        >
+                          <div className="flex gap-3">
+                            <span className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${item.type === "success" ? "bg-green-500" : item.type === "warning" ? "bg-amber-500" : item.type === "error" ? "bg-red-500" : "bg-blue-500"}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                                {!item.read && <span className="text-[10px] text-blue-600 font-semibold">NEW</span>}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">{item.message}</p>
+                              <p className="text-[10px] text-slate-400 mt-2">{new Date(item.createdAt).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -391,20 +404,21 @@ function App({ onLogout }: { onLogout?: () => void }) {
                 className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition"
               >
                 <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
-                  A
+                  {(currentUser?.full_name || currentUser?.email || "A").charAt(0).toUpperCase()}
                 </div>
 
                 <div className="text-left">
-                  <p className="text-sm font-semibold">Admin</p>
-                  <p className="text-xs text-slate-500">Administrator</p>
+                  <p className="text-sm font-semibold">{currentUser?.full_name || "Administrator"}</p>
+                  <p className="text-xs text-slate-500 max-w-[220px] truncate">{currentUser?.email || "Loading account…"}</p>
                 </div>
               </button>
 
               {showProfile && (
-                <div className="absolute right-0 top-14 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-14 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-4 border-b border-slate-200">
-                    <p className="font-semibold text-slate-900">Admin</p>
-                    <p className="text-sm text-slate-500 mt-0.5">Administrator</p>
+                    <p className="font-semibold text-slate-900">{currentUser?.full_name || "Administrator"}</p>
+                    <p className="text-sm text-slate-600 mt-1 break-all">{currentUser?.email || "Loading account…"}</p>
+                    {currentUser?.business_name && <p className="text-xs text-slate-500 mt-1">{currentUser.business_name}</p>}
                     <div className="mt-3 inline-flex items-center gap-2 text-xs text-green-700 bg-green-50 px-2.5 py-1.5 rounded-full">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                       Active session
@@ -412,27 +426,16 @@ function App({ onLogout }: { onLogout?: () => void }) {
                   </div>
 
                   <div className="p-2">
-                    <button
-                      type="button"
-                      onClick={() => { setPage("Settings"); setShowProfile(false); }}
-                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition"
-                    >
+                    <button type="button" onClick={() => { setPage("Settings"); setShowProfile(false); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition">
                       ⚙ Settings
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition"
-                    >
+                    <button type="button" onClick={handleLogout} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">
                       ↪ Logout
                     </button>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Keep the existing quick logout button */}
-           
 
           </div>
 
@@ -450,7 +453,7 @@ function App({ onLogout }: { onLogout?: () => void }) {
           )}
 
           {page === "Users" && (
-            <UsersPage />
+            <UsersPage onNotify={pushNotification} />
           )}
 
           {page === "API Logs" && (
@@ -458,10 +461,27 @@ function App({ onLogout }: { onLogout?: () => void }) {
           )}
 
           {page === "Settings" && (
-            <SettingsPage />
+            <SettingsPage onNotify={pushNotification} />
           )}
 
         </div>
+
+        {toast && (
+          <div className="fixed right-6 bottom-6 z-[100] w-[360px] max-w-[calc(100vw-3rem)]">
+            <div className={`rounded-xl border shadow-2xl px-4 py-3 bg-white ${toast.type === "success" ? "border-green-200" : toast.type === "warning" ? "border-amber-200" : toast.type === "error" ? "border-red-200" : "border-blue-200"}`}>
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${toast.type === "success" ? "bg-green-100 text-green-700" : toast.type === "warning" ? "bg-amber-100 text-amber-700" : toast.type === "error" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+                  {toast.type === "success" ? "✓" : toast.type === "error" ? "!" : toast.type === "warning" ? "⚠" : "i"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">{toast.title}</p>
+                  <p className="text-xs text-slate-500 mt-1">{toast.message}</p>
+                </div>
+                <button type="button" onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-700">×</button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </main>
 
@@ -1948,7 +1968,7 @@ function VillagesPage() {
 }
 
 
-function UsersPage() {
+function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, type?: NotificationType) => void }) {
   const [tab, setTab] = useState<"users" | "keys">("users");
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
@@ -2043,8 +2063,11 @@ function UsersPage() {
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       setSelectedUser(updated);
       setNotes(updated.admin_notes || "");
+      onNotify?.("User updated", `${updated.email} was updated successfully.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update user.");
+      const message = err instanceof Error ? err.message : "Unable to update user.";
+      setError(message);
+      onNotify?.("User update failed", message, "error");
     } finally {
       setSavingUser(false);
     }
@@ -2054,8 +2077,11 @@ function UsersPage() {
     try {
       const updated = await approveAdminUser(user.id, { plan: user.plan || "free" });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      onNotify?.("User approved", `${updated.email} is now approved.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to approve user.");
+      const message = err instanceof Error ? err.message : "Unable to approve user.";
+      setError(message);
+      onNotify?.("User approval failed", message, "error");
     }
   };
 
@@ -2065,8 +2091,11 @@ function UsersPage() {
     try {
       const updated = await rejectAdminUser(user.id, { reason });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      onNotify?.("User rejected", `${updated.email} was rejected.`, "warning");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to reject user.");
+      const message = err instanceof Error ? err.message : "Unable to reject user.";
+      setError(message);
+      onNotify?.("User rejection failed", message, "error");
     }
   };
 
@@ -2079,8 +2108,11 @@ function UsersPage() {
       });
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       if (selectedUser?.id === updated.id) setSelectedUser(updated);
+      onNotify?.("User status changed", `${updated.email} is now ${updated.status}.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to change user status.");
+      const message = err instanceof Error ? err.message : "Unable to change user status.";
+      setError(message);
+      onNotify?.("User status change failed", message, "error");
     }
   };
 
@@ -2091,8 +2123,11 @@ function UsersPage() {
       setUsers(prev => prev.filter(u => u.id !== user.id));
       setSelectedIds(prev => prev.filter(id => id !== user.id));
       if (selectedUser?.id === user.id) setSelectedUser(null);
+      onNotify?.("User deleted", `${user.email} was deleted successfully.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete user.");
+      const message = err instanceof Error ? err.message : "Unable to delete user.";
+      setError(message);
+      onNotify?.("User deletion failed", message, "error");
     }
   };
 
@@ -2107,8 +2142,11 @@ function UsersPage() {
         if (action === "delete") await deleteAdminUser(id);
       }
       await loadUsers();
+      onNotify?.("Bulk action completed", `${selectedIds.length} user(s) were ${action}d.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk action failed.");
+      const message = err instanceof Error ? err.message : "Bulk action failed.";
+      setError(message);
+      onNotify?.("Bulk action failed", message, "error");
       setLoading(false);
     }
   };
@@ -2172,8 +2210,11 @@ function UsersPage() {
       const refreshed = await getUserStateAccess(selectedUser.id);
       setStateAccess(refreshed);
       setSelectedStates(refreshed.granted_state_ids || []);
+      onNotify?.("State access updated", `State access for ${selectedUser.email} was saved.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update state access.");
+      const message = err instanceof Error ? err.message : "Unable to update state access.";
+      setError(message);
+      onNotify?.("State access update failed", message, "error");
     } finally {
       setStateLoading(false);
     }
@@ -2198,8 +2239,11 @@ function UsersPage() {
       setNewKeySecret(result.secret || null);
       setNewKeyName("");
       await loadKeys();
+      onNotify?.("API key created", `API key "${result.name || newKeyName.trim()}" was created successfully.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create API key.");
+      const message = err instanceof Error ? err.message : "Unable to create API key.";
+      setError(message);
+      onNotify?.("API key creation failed", message, "error");
     } finally {
       setCreatingKey(false);
     }
@@ -2213,8 +2257,11 @@ function UsersPage() {
       setRotatedKeyValue(result.key || result.api_key || null);
       setRotatedSecret(result.secret || result.api_secret || null);
       await loadKeys();
+      onNotify?.("API key rotated", "The old API key was deactivated and a new key was generated.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to rotate API key.");
+      const message = err instanceof Error ? err.message : "Unable to rotate API key.";
+      setError(message);
+      onNotify?.("API key rotation failed", message, "error");
     } finally {
       setRotatingId(null);
     }
@@ -2225,8 +2272,11 @@ function UsersPage() {
       setUpdatingKeyId(key.id);
       await updateAdminApiKey(key.id, { is_active: !key.is_active });
       await loadKeys();
+      onNotify?.(key.is_active ? "API key deactivated" : "API key activated", `API key "${key.name}" is now ${key.is_active ? "inactive" : "active"}.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update API key.");
+      const message = err instanceof Error ? err.message : "Unable to update API key.";
+      setError(message);
+      onNotify?.("API key update failed", message, "error");
     } finally {
       setUpdatingKeyId(null);
     }
@@ -2961,7 +3011,7 @@ function LogStatCard({
    SETTINGS
 ========================= */
 
-function SettingsPage() {
+function SettingsPage({ onNotify }: { onNotify?: (title: string, message: string, type?: NotificationType) => void }) {
   const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:8000/api/v1";
@@ -3014,6 +3064,7 @@ function SettingsPage() {
         JSON.stringify(notifications)
       );
       setSavedMessage("Settings saved successfully.");
+      onNotify?.("Settings saved", "Notification preferences were saved successfully.", "success");
     } catch (error) {
       console.error("Failed to save settings:", error);
       setSavedMessage("Unable to save settings.");

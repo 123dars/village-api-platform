@@ -15,6 +15,19 @@ function getAccessToken(): string {
   );
 }
 
+export interface CurrentUser {
+  id: number;
+  email: string;
+  full_name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  status?: string;
+  plan?: string;
+  business_name?: string | null;
+  phone?: string | null;
+  created_at?: string;
+}
+
 export interface State {
   id: number;
   name: string;
@@ -225,6 +238,10 @@ async function apiRequest<T>(
   }
 
   return data as T;
+}
+
+export async function getCurrentUser(): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>("/auth/me");
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
