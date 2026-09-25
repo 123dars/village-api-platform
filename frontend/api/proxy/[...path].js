@@ -11,29 +11,45 @@ export default async function handler(req, res) {
 
   try {
     const rawPath = req.query?.path;
-    const path = Array.isArray(rawPath) ? rawPath.join("/") : (rawPath || "");
-    const incomingUrl = new URL(req.url, `https://${req.headers.host}`);
-    const target = new URL(`${backendBase.replace(/\/$/, "")}/${path}`);
+
+    const path = Array.isArray(rawPath)
+      ? rawPath.join("/")
+      : rawPath || "";
+
+    const incomingUrl = new URL(
+      req.url,
+      `https://${req.headers.host}`
+    );
+
+    const target = new URL(
+      `${backendBase.replace(/\/+$/, "")}/${path}`
+    );
+
     target.search = incomingUrl.search;
 
-    const headers = {
-      "X-API-Key": apiKey,
-      "X-API-Secret": apiSecret,
-      Accept: req.headers.accept || "application/json",
-    };
+    const headers = new Headers();
+
+    headers.set("X-API-Key", apiKey);
+    headers.set("X-API-Secret", apiSecret);
+    headers.set("Accept", "application/json");
 
     if (req.headers.authorization) {
-      headers.Authorization = req.headers.authorization;
+      headers.set("Authorization", req.headers.authorization);
     }
 
     if (req.headers["content-type"]) {
-      headers["Content-Type"] = req.headers["content-type"];
+      headers.set("Content-Type", req.headers["content-type"]);
     }
 
-    const hasBody = !["GET", "HEAD"].includes(req.method || "GET");
-    const body = hasBody ? await readRequestBody(req) : undefined;
+    const hasBody = !["GET", "HEAD"].includes(
+      req.method || "GET"
+    );
 
-    const response = await fetch(target, {
+    const body = hasBody
+      ? await readRequestBody(req)
+      : undefined;
+
+    const response = await fetch(target.toString(), {
       method: req.method || "GET",
       headers,
       body,
@@ -41,12 +57,22 @@ export default async function handler(req, res) {
     });
 
     const contentType = response.headers.get("content-type");
-    if (contentType) res.setHeader("Content-Type", contentType);
 
-    const responseBody = Buffer.from(await response.arrayBuffer());
-    return res.status(response.status).send(responseBody);
+    if (contentType) {
+      res.setHeader("Content-Type", contentType);
+    }
+
+    const responseBody = Buffer.from(
+      await response.arrayBuffer()
+    );
+
+    return res
+      .status(response.status)
+      .send(responseBody);
+
   } catch (error) {
     console.error("Village API proxy error:", error);
+
     return res.status(502).json({
       error: "Unable to reach the Village API backend.",
     });
@@ -59,8 +85,14 @@ async function readRequestBody(req) {
   }
 
   const chunks = [];
+
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    chunks.push(
+      Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk)
+    );
   }
+
   return Buffer.concat(chunks);
 }
