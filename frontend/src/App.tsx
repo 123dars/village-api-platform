@@ -33,6 +33,7 @@ import {
   updateUserStateAccess,
   getAdminLogs,
   getCurrentUser,
+  API_BASE_URL,
   type DashboardStats,
   type State,
   type District,
@@ -191,7 +192,7 @@ function App({ onLogout }: { onLogout?: () => void }) {
     };
 
     pollSecurityEvents();
-    const timer = window.setInterval(pollSecurityEvents, 15000);
+    const timer = window.setInterval(pollSecurityEvents, 5000);
     return () => {
       mounted = false;
       window.clearInterval(timer);
@@ -2620,7 +2621,7 @@ function UsersPage({ onNotify }: { onNotify?: (title: string, message: string, t
               </div>
 
               <div className="border-t pt-5"><h4 className="font-semibold mb-2">State access</h4>{stateLoading ? <p className="text-sm text-slate-500">Loading state access...</p> : stateAccess ? <><p className="text-sm text-slate-500 mb-3">{stateAccess.has_full_access ? "Full access: no state restrictions are configured." : `${selectedStates.length} state(s) explicitly granted.`}</p><div className="max-h-48 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 border rounded-lg p-3">{stateAccess.states.map(state => <label key={state.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedStates.includes(state.id)} onChange={e => setSelectedStates(prev => e.target.checked ? [...prev, state.id] : prev.filter(id => id !== state.id))}/>{state.name} ({state.code})</label>)}</div><button onClick={saveStateAccess} disabled={stateLoading} className="mt-3 px-4 py-2 border rounded-lg">Save state access</button></> : null}</div>
-              <div className="flex flex-wrap gap-2 pt-2"><button onClick={() => approveUser(selectedUser)} className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200 active:scale-95 transition-all">✓ Approve</button><button onClick={() => suspendOrActivate(selectedUser)} className={`px-4 py-2 rounded-lg text-sm font-medium border active:scale-95 transition-all ${selectedUser.status === "active" ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:bg-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200"}`}>{selectedUser.status === "active" ? "⏸ Suspend" : "✓ Activate"}</button><button onClick={() => rejectUser(selectedUser)} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:bg-red-200 active:scale-95 transition-all">✕ Reject</button><button onClick={() => deleteUser(selectedUser)} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 active:bg-red-300 active:scale-95 transition-all">🗑 Delete</button></div>
+              <div className="flex flex-wrap gap-2 pt-2"><button onClick={() => approveUser(selectedUser)} className="px-4 py-2 border rounded-lg">Approve</button><button onClick={() => suspendOrActivate(selectedUser)} className="px-4 py-2 border rounded-lg">{selectedUser.status === "active" ? "Suspend" : "Activate"}</button><button onClick={() => rejectUser(selectedUser)} className="px-4 py-2 border rounded-lg">Reject</button><button onClick={() => deleteUser(selectedUser)} className="px-4 py-2 border border-red-200 text-red-600 rounded-lg">Delete</button></div>
             </div>
           </div>
         </div>
@@ -3054,9 +3055,8 @@ function LogStatCard({
 ========================= */
 
 function SettingsPage({ onNotify }: { onNotify?: (title: string, message: string, type?: NotificationType) => void }) {
-  const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8000/api/v1";
+  const apiBaseUrl = API_BASE_URL;
+  const productionProxy = import.meta.env.PROD;
 
   const detectedEnvironment = (() => {
     const value = apiBaseUrl.toLowerCase();
@@ -3085,7 +3085,6 @@ function SettingsPage({ onNotify }: { onNotify?: (title: string, message: string
     return {
       usageAlerts: true,
       securityAlerts: true,
-      weeklyReports: false,
     };
   });
 
@@ -3152,7 +3151,9 @@ function SettingsPage({ onNotify }: { onNotify?: (title: string, message: string
                 className="w-full border border-slate-300 rounded-lg px-4 py-3 mt-2 bg-slate-50 text-slate-700 outline-none"
               />
               <p className="text-xs text-slate-500 mt-2">
-                This value is provided by the frontend environment configuration.
+                {productionProxy
+                  ? "Production requests use a secure server-side proxy; API credentials are not exposed in the browser."
+                  : "This value is provided by the local frontend environment configuration."}
               </p>
             </div>
 
@@ -3215,22 +3216,6 @@ function SettingsPage({ onNotify }: { onNotify?: (title: string, message: string
               />
             </label>
 
-            <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-4 hover:bg-slate-50 transition cursor-pointer">
-              <div>
-                <p className="font-medium text-slate-800">
-                  Weekly reports
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Receive a weekly platform usage summary
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.weeklyReports}
-                onChange={() => updateNotification("weeklyReports")}
-                className="h-4 w-4 accent-blue-600"
-              />
-            </label>
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-4">

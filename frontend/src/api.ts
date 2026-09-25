@@ -1,11 +1,10 @@
 // src/api.ts
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:8000/api/v1";
-
-const API_KEY = import.meta.env.VITE_API_KEY || "";
-const API_SECRET = import.meta.env.VITE_API_SECRET || "";
+// Production requests go through the Vercel server-side proxy so API
+// credentials never need to be embedded in the browser bundle.
+export const API_BASE_URL = import.meta.env.PROD
+  ? "/api/proxy"
+  : import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 function getAccessToken(): string {
   return (
@@ -187,18 +186,6 @@ async function apiRequest<T>(
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-
-    ...(API_KEY
-      ? {
-          "X-API-Key": API_KEY,
-        }
-      : {}),
-
-    ...(API_SECRET
-      ? {
-          "X-API-Secret": API_SECRET,
-        }
-      : {}),
 
     ...(accessToken
       ? {
@@ -534,9 +521,11 @@ export async function updateAdminApiKey(
 }
 
 export async function checkApiHealth() {
-  const baseUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+  const healthUrl = import.meta.env.PROD
+    ? `${API_BASE_URL}/health`
+    : `${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/health`;
 
-  const response = await fetch(`${baseUrl}/health`);
+  const response = await fetch(healthUrl);
 
   if (!response.ok) {
     throw new Error(
