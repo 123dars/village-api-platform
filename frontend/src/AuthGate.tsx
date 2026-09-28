@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import App from "./App";
 import Login from "./Login.tsx";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "./api";
 
 export default function AuthGate() {
   const [authenticated, setAuthenticated] = useState(false);
