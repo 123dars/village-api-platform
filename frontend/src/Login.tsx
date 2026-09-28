@@ -15,6 +15,7 @@ type LoginResponse = {
   token_type?: string;
   detail?: string;
   message?: string;
+  error?: string;
 };
 
 type LoginProps = {
