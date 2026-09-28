@@ -4,10 +4,10 @@ import "./Login.css";
 import { API_BASE_URL } from "./api";
 
 const DEMO_EMAIL =
-  import.meta.env.VITE_DEMO_EMAIL || "your-demo-email@example.com";
+  import.meta.env.VITE_DEMO_EMAIL || "admin123@example.com";
 
 const DEMO_PASSWORD =
-  import.meta.env.VITE_DEMO_PASSWORD || "your-demo-password";
+  import.meta.env.VITE_DEMO_PASSWORD || "admin@123";
 
 type LoginResponse = {
   access_token?: string;
