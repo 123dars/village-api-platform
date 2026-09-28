@@ -68,7 +68,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (!response.ok) {
         throw new Error(
-          data.detail ||
+          data.error ||
+            data.detail ||
             data.message ||
             `Login failed with status ${response.status}`
         );
