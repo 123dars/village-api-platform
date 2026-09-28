@@ -1,75 +1,55 @@
-# 🌱 Village API — Rural Data & Administration Platform
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12-blue.svg?logo=python&logoColor=white" alt="Python 3.12">
-  <img src="https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi" alt="FastAPI">
-  <img src="https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB" alt="React">
-  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL">
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT">
-</p>
-
-<p align="center"><strong>India Village Data API + Admin Dashboard</strong><br>A full-stack platform for accessing, searching, managing, and monitoring village-level location data.</p>
-
-## ?? Live Demo
-
-- **Backend API (Swagger UI):** [https://village-api-backend-07b0.onrender.com/docs](https://village-api-backend-07b0.onrender.com/docs)
-- **Frontend Admin Dashboard:** [https://village-api-platform-psi.vercel.app](https://village-api-platform-psi.vercel.app)
+﻿<div align="center">
+  <img src="frontend/public/village-login-bg.png" alt="Village API Platform" width="100%" style="max-height: 300px; object-fit: cover; border-radius: 12px; margin-bottom: 20px;">
+  
+  <h1>🌟 Village API Platform</h1>
+  <p><strong>A unified B2B platform providing structured Indian village and administrative-location data through secure REST APIs and an administrator dashboard.</strong></p>
+  
+  <p>
+    <a href="https://village-api-platform-psi.vercel.app"><strong>🔗 Live Admin Dashboard</strong></a> |
+    <a href="https://village-api-backend-07b0.onrender.com/docs"><strong>🔗 Live API Documentation (Swagger)</strong></a>
+  </p>
+</div>
 
 ---
 
----
+## 🚀 Project Overview
 
-## 📌 Project Overview
+**Village API** is a full-stack platform serving over **564,000+ villages**, 580+ districts, and 30+ states across India. 
 
-**Village API** is a full-stack B2B platform providing structured Indian village and administrative-location data through secure REST APIs and an administrator dashboard.
-
-**Hierarchy:** Country → State → District → Sub-district → Village
-
-The platform combines a **FastAPI** backend, **React + TypeScript + Vite** frontend, **PostgreSQL/NeonDB**, **Redis**-supported services, JWT authentication, API-key authentication, Alembic migrations, analytics, and administration tools.
+The platform combines a **FastAPI** backend, a beautiful **React + TypeScript + Vite** frontend, a scalable **Neon PostgreSQL** database, and secure **Serverless Proxy** routing to provide seamless data access, analytics, and team management tools.
 
 ---
 
 ## ✨ Key Features
 
-### 🗺️ Location Hierarchy
-- **Navigation:** State → District → Sub-district → Village
-- **Functionality:** Village search, filtering, and pagination
-- **Data:** Village codes and administrative metadata
+### 📍 Location Hierarchy & Quick Search
+- **Navigation:** State -> District -> Sub-district -> Village.
+- **Search:** Instant multi-level search across village names/codes, districts, and states.
 
-### 🔎 Quick Search
-Search across village name/code, sub-district name/code, district name/code, and state name/code.
+### 📊 Admin Analytics Dashboard
+- Monitor total platform metrics, active users, API request volume, and average response times.
+- View real-time "Top States" leaderboards and API request trends.
 
-### 📊 Admin Dashboard
-Monitor and analyze platform metrics:
-- Total villages
-- Active users
-- API requests
-- Average response time
-- Villages by state
-- API request trends & Usage analytics
+### 👥 User & API Key Management
+- Admins can manage users (approve, suspend, delete) and issue secure API Keys (pk_live_... & sk_live_...).
+- Complete rate-limiting, usage tracking, and API secret rotation support.
 
-### 👥 User Management
-Administrators can search, filter, view, approve, suspend, activate, and delete users, inspect user-specific API keys and request history, and manage state access.
-
-### 🔑 API Key Management
-Create, activate, revoke, and rotate API keys; configure rate limits; view request counts; and associate keys with users.
-
-### 📜 API Logs
-View timestamp, API key, method, endpoint, response status, response time, and IP information. Supports search, filtering, pagination, and CSV export.
+### 📝 Global Request Logging
+- Every programmatic API request made with an API Key is tracked, showing endpoint, status code, execution time (in ms), and IP metadata for billing and security.
 
 ---
 
 ## 🏗️ Architecture
 
-```mermaid
+`mermaid
 flowchart TD
-    A[Admin User] --> B(React + TypeScript Admin Dashboard)
-    B -- REST API --> C{FastAPI Backend}
-    C --> D[(PostgreSQL / NeonDB)]
-    C --> E[(Redis)]
-```
+    User([Browser Client]) -->|JWT Auth| Vercel(Vercel Frontend)
+    Vercel -->|Serverless Proxy + X-API-Key| Render(Render FastAPI Backend)
+    Render <-->|SQLAlchemy| DB[(Neon PostgreSQL)]
+    Render <-->|Upstash| Redis[(Redis Cache)]
+`
+
+> **Security Note:** To prevent exposing the Master API Key in the browser, the React frontend makes requests to a secure **Vercel Serverless Function** (/api/proxy). This proxy attaches the sensitive X-API-Key and X-API-Secret headers before securely forwarding the request to the Render backend!
 
 ---
 
@@ -77,206 +57,72 @@ flowchart TD
 
 | Layer | Technologies |
 | --- | --- |
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS, Recharts, Zustand, TanStack React Query |
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS, Recharts, TanStack Query |
 | **Backend** | Python, FastAPI, SQLAlchemy, Uvicorn |
-| **Database** | PostgreSQL, NeonDB |
-| **Migrations** | Alembic |
-| **Supporting Services** | Redis |
-| **Authentication** | JWT, API Key + API Secret |
+| **Database** | PostgreSQL (NeonDB), Alembic Migrations |
+| **Caching/State** | Upstash Redis |
+| **Hosting** | Vercel (Frontend + Proxy), Render (Backend) |
 
 ---
 
-## 📁 Project Structure
+## 💻 Local Development Setup
 
-```text
-Village_API/
-├── README.md
-├── LICENSE
-├── backend/
-│   ├── app/
-│   ├── alembic/
-│   ├── dataset/          # Contains the raw Census data
-│   ├── scripts/          # ETL and database seeding scripts
-│   ├── Dockerfile
-│   ├── main.py
-│   └── pyproject.toml
-└── frontend/
-    ├── src/
-    ├── package.json
-    └── vite.config.ts
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Python 3.12+ (Using `uv`)
-- Node.js and npm
-- PostgreSQL / NeonDB
-- Git
-
-### Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Set up the virtual environment (using `uv` is recommended):
-   ```bash
-   uv venv
-   # Windows:
-   .venv\Scripts\activate
-   # macOS/Linux:
-   source .venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   uv sync
-   ```
-4. Create `backend/.env` using `backend/.env.example`:
-   ```env
-   DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
-   JWT_SECRET=your_jwt_secret_key
-   ```
-5. Apply Database Migrations:
-   ```bash
-   alembic upgrade head
-   ```
-6. **Seed the Database (Important):**
-   To import the 564K village records from the dataset into your PostgreSQL database, run the ETL script:
-   ```bash
-   uv run python scripts/seed_data.py
-   ```
-7. Run the development server:
-   ```bash
-   uvicorn main:app --reload --port 8000
-   ```
-   **Backend:** http://127.0.0.1:8000  
-   **Swagger UI:** http://127.0.0.1:8000/docs  
-
-### Frontend Setup
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create `frontend/.env` using `frontend/.env.example`:
-   ```env
-   VITE_API_BASE_URL=http://localhost:8000/api/v1
-   VITE_API_KEY=your_demo_api_key
-   VITE_API_SECRET=your_demo_api_secret
-   VITE_DEMO_EMAIL=demo@example.com
-   VITE_DEMO_PASSWORD=your_demo_password
-   ```
-   *(Note: Do not place master/private production secrets in the frontend. Use dedicated restricted credentials.)*
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
----
-
-## 🐳 Docker Support
-
-The backend includes a highly optimized Dockerfile using `uv`. To build and run the backend via Docker:
-
-```bash
+### 1. Backend Setup
+`ash
 cd backend
-docker build -t village-api-backend .
-docker run -p 8000:8000 --env-file .env village-api-backend
-```
-
----
-
-## 🔄 Authentication Flow
-
-1. **Email + Password** ➔ `POST /auth/login` ➔ **JWT Access Token**
-2. **JWT Access Token** ➔ `GET /auth/me` ➔ **Admin Verification** ➔ **Admin Dashboard**
-
-*API consumers authenticate with `X-API-Key` and `X-API-Secret` according to the configured backend security rules.*
-
----
-
-## 📚 Main API Areas
-
-- `/auth/login` & `/auth/me`
-- `/states`, `/districts`, `/subdistricts`, `/villages`
-- `/autocomplete` & `/search`
-- `/admin/users`, `/admin/keys`, `/admin/logs`, `/admin/usage`, `/admin/overview`
-- `/analytics/summary`, `/analytics/request-trend`, `/analytics/top-states`
-
-*Use `/docs` as the authoritative source for the exact current endpoints, parameters, and schemas.*
-
----
-
-## 🗄️ Database
-
-Major data areas include: `users`, `api_keys`, `request_logs`, `countries`, `states`, `districts`, `sub_districts`, `villages`, `user_state_access`, `alembic_version`.
-
-### Migrations
-```bash
-# Check current migration status
-alembic current
-
-# Upgrade to the latest migration
+uv venv
+# Windows: .venv\Scripts\activate | Mac/Linux: source .venv/bin/activate
+uv sync
+`
+Create ackend/.env:
+`env
+DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+REDIS_URL=rediss://default:password@host:6379
+JWT_SECRET=your_jwt_secret_key
+`
+Run migrations and start:
+`ash
 alembic upgrade head
+uvicorn main:app --reload --port 8000
+`
 
-# Generate a new migration (always review before applying)
-alembic revision --autogenerate -m "describe change"
-```
+### 2. Frontend Setup
+`ash
+cd frontend
+npm install
+`
+Create rontend/.env:
+`env
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_DEMO_EMAIL=admin123@example.com
+VITE_DEMO_PASSWORD=admin@123
+`
+*(In development, the frontend connects directly to localhost:8000. In production on Vercel, it routes through the secure serverless proxy).*
+
+Start the frontend:
+`ash
+npm run dev
+`
 
 ---
 
-## 🌐 Deployment
+## ☁️ Production Deployment Checklist
 
-**Recommended deployment architecture:**
-- **Frontend** → Vercel / Netlify
-- **Backend** → Render / Railway / Docker Container
-- **Database** → Neon PostgreSQL
-- **Redis** → Managed Redis (e.g., Upstash)
+This project is fully configured for cloud deployment. Ensure the following environment variables are set in **Vercel**:
+- VILLAGE_API_BASE_URL: The URL of your deployed Render backend (e.g., https://.../api/v1).
+- VILLAGE_API_KEY: The Master API Key (generated in the dashboard).
+- VILLAGE_API_SECRET: The Master API Secret (generated in the dashboard).
 
-**Production Checklist:**
-- [ ] Real `.env` files are not committed
-- [ ] Production secrets are securely stored in hosting environment variables
-- [ ] Dedicated demo/admin account is used
-- [ ] Master API secrets are not exposed in frontend code
-- [ ] Backend CORS allows only the deployed frontend origin
-- [ ] API keys have appropriate rate limits
-- [ ] Database migrations are applied
+*(If you receive a status 500 error on login in production, verify these three variables are set in Vercel and the deployment has been refreshed!)*
 
 ---
 
 ## 👥 Team
 
-This project was developed collaboratively.
-
-| Team Member | Primary Responsibility |
-| :--- | :--- |
-| **Priya Singh** | Backend development, FastAPI, REST APIs, authentication, backend integration |
-| **Vinay** | Database & Data engineering, village data preparation/import, PostgreSQL/NeonDB |
-| **Darshan B** | Frontend development, React dashboard, UI/UX, frontend-backend integration |
-
----
-
-## 📈 Future Enhancements
-
-- [ ] Advanced analytics
-- [ ] Granular API usage controls
-- [ ] Billing/subscription integration
-- [ ] More detailed API consumer documentation
-- [ ] Caching and query optimization
-- [ ] Granular role-based administration
-- [ ] Production monitoring and alerting
-- [ ] Automated CI/CD pipelines
-
----
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
+This project was developed collaboratively:
+- **Priya Singh**: Backend development, FastAPI, REST APIs, authentication, backend integration
+- **Vinay**: Database & Data engineering, village data preparation/import, PostgreSQL/NeonDB
+- **Darshan B**: Frontend development, React dashboard, UI/UX, frontend-backend integration
 
 ---
 
